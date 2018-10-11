@@ -1,5 +1,5 @@
 REGISTER '/home/acadgild/airline_usecase/piggybank.jar';
-A = load '/home/acadgild/airline_usecase/DelayedFlights.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+A = load '/home/acadgild/airline_usecase/DelayedFlights.csv' USING PigStorage(',');
 B = foreach A generate (int)$1 as year, (int)$10 as flight_num, (chararray)$17 as origin,(chararray) $18 as dest;
 C = filter B by dest is not null;
 D = group C by dest;
