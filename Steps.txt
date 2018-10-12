@@ -1,0 +1,13 @@
+1. Open Eclipse > file > new > java project > project name > finish
+2. Right click > new > package > package name > finish
+3. Right click > new > classes > finish
+4. Right click > Build Path > Add external jar files
+5. Right click on project > export > select export destination as jar file > next > finish
+6. Take input file and move into hdfs
+	a)$ hadoop fs -mkdir /directory name
+	b)$ hadoop -put inputfile.txt /directory name
+7. Run jar file
+	$ hadoop jar jarpath/jarfilename.jar packageName.classname(class containing main) path_to_input_file path_to_output_directory
+	Example :
+	$ hadoop jar /home/hduser/desktop/test/temp.jar Temp.Tdriver(class containing main) /inputdata/temp_data output_data
+8.open http://localhost:50070/ to see results.
