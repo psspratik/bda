@@ -1,0 +1,43 @@
+Add these jar files to java project of eclipse
+
+/usr/local/pig/pig-0.15.0-core-h1.jar
+/usr/local/pig/pig-0.15.0-core-h2.jar
+
+Sample_Eval.java
+
+package pig;
+import java.io.IOException;
+import org.apache.pig.EvalFunc;
+import org.apache.pig.data.Tuple;
+public class Sample_Eval extends EvalFunc<String> {
+	public String exec(Tuple input) throws IOException {
+		if (input == null || input.size() == 0)
+			return null;
+		String str = (String) input.get(0);
+		return str.toUpperCase();
+	}
+}
+
+
+
+REGISTER 'hdfs://localhost:9000/user/hduser/pig/sample_udf.jar'
+
+
+Create employee_new.txt with following data
+
+1,John,2007-01-24,250
+2,Ram,2007-05-27,220
+3,Jack,2007-05-06,170
+3,Jack,2007-04-06,100
+4,Jill,2007-04-06,220
+5,Zara,2007-06-06,300
+5,Zara,2007-02-06,35
+
+
+employee_data = LOAD 'hdfs://localhost:9000/user/hduser/pig/employee_new.txt' USING PigStorage(',') as (id:int, name:chararray,workdate:chararray,daily_typing_pages:int);
+
+
+Upper_case = FOREACH employee_data GENERATE pig.Sample_Eval(name);
+Dump Upper_case;
+
+
