@@ -1,0 +1,43 @@
+Create input text file and store locally
+
+RAVI	kumar
+PRATIK	saxena
+MAHESH	babu
+JOHN	abraham
+RAHUL	bose
+
+
+The create table in hive use these commands
+
+
+hive> CREATE table mytable(
+    > fname STRING,
+    > lname STRING)
+    > ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'STORED AS TEXTFILE;
+
+
+load input file in hive resources
+
+hive> LOAD DATA LOCAL INPATH '/home/pratik102/Desktop/BDA_programs/Hive_UDF/input.txt' OVERWRITE INTO TABLE mytable;
+
+
+Create my.py file and write python code in it and save locally
+
+import sys
+import datetime
+for line in sys.stdin:
+ line = line.strip()
+ fname , lname = line.split('\t')
+ l_name = lname.upper()
+ print '\t'.join([fname, str(l_name)])
+
+
+Add that file in hive resources 
+
+hive> add FILE /home/pratik102/Desktop/BDA_programs/Hive_UDF/my.py;
+
+Run this for final output
+
+hive> SELECT TRANSFORM(fname, lname) USING 'python my.py' AS (fname, l_name) FROM mytable;
+
+
