@@ -18,7 +18,7 @@ public class Sample_Eval extends EvalFunc<String> {
 	}
 }
 
-
+Type local file path instead of localhost everywhere below
 
 REGISTER 'hdfs://localhost:9000/user/hduser/pig/sample_udf.jar'
 
