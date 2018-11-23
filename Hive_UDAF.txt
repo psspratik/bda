@@ -1,0 +1,79 @@
+Finding maximum number using UDAF
+
+
+Make a jar file of below java project in eclipse 
+
+
+import org.apache.hadoop.hive.ql.exec.UDAF;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.hive.ql.exec.UDAFEvaluator;
+public class Max extends UDAF
+{
+public static class MaxIntUDAFEvaluator implements UDAFEvaluator
+{
+private IntWritable output;
+public void init()
+{
+output=null;
+}
+public boolean iterate(IntWritable maxvalue) // Process input table
+{
+if(maxvalue==null)
+{
+return true;
+}
+if(output == null)
+{
+output = new IntWritable(maxvalue.get());
+}
+else
+{
+output.set(Math.max(output.get(), maxvalue.get()));
+}
+return true;
+}
+public IntWritable terminatePartial()
+{
+return output;
+}
+public boolean merge(IntWritable other)
+{
+return iterate(other);
+}
+public IntWritable terminate() //final result
+{
+return output;
+}
+}
+}
+
+
+Create input dataset something like this
+
+923
+413
+5234
+4421
+56
+990
+3020
+239
+4453
+213
+5566
+
+
+Type this in hive shell
+
+hive> create table Num_list(Num int) ROW FORMAT DELIMITED
+    > lines TERMINATED BY '\n';
+
+
+hive> load data local inpath '/home/pratik102/Desktop/BDA_programs/Hive_UDAF/Input_data.txt' into table Num_list;
+hive> ADD JAR /home/pratik102/Desktop/BDA_programs/Hive_UDAF/HiveUDAF.jar;
+hive> CREATE TEMPORARY FUNCTION max AS 'Max';
+hive> SELECT max(Num) from Num_list;
+
+
+
+
