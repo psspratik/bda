@@ -1,3 +1,5 @@
+Find the top five kinds of GoogleKnowlege_Occupation people who were guests in the show, in a particular time period.
+
 A = load '/home/kiran/dialy_shows' using PigStorage(',') AS (year:chararray,occupation:chararray,date:chararray,group:chararray,gusetlist:chararray);
 B = foreach A generate occupation,date;
 C = foreach B generate occupation,ToDate(date,'MM/dd/yy') as date;
@@ -7,3 +9,14 @@ E = group D by occupation;
 F = foreach E generate group, COUNT(D) as cnt;
 G = order F by cnt desc;
 H = limit G 5;
+
+
+Find out the number of politicians who came each year. 
+
+A = load '/home/kiran/dialy_shows' using PigStorage(',') AS (year:chararray,occupation:chararray,date:chararray,group:chararray,gusetlist:chararray);
+B = foreach A generate year,group;
+C = filter B by group == 'Politician';
+D = group C by year;
+E = foreach D generate group, COUNT(C) as cnt;
+F = order E by cnt desc;
+
