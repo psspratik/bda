@@ -1,0 +1,801 @@
+1.Word count application using MapperReducer on single node cluster
+ 
+package wordcount;
+import java.io.IOException;
+import java.util.StringTokenizer;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class WordCount {
+
+ public static class TokenizerMapper
+ extends Mapper<Object, Text, Text, IntWritable>{
+
+ private final static IntWritable one = new IntWritable(1);
+ private Text word = new Text();
+
+ public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+ StringTokenizer itr = new StringTokenizer(value.toString());
+ while (itr.hasMoreTokens()) {
+ word.set(itr.nextToken());
+ 	context.write(word, one);
+      }
+   }
+ }
+
+ public static class IntSumReducer
+ extends Reducer<Text,IntWritable,Text,IntWritable> {
+ private IntWritable result = new IntWritable();
+
+ public void reduce(Text key, Iterable<IntWritable> values,Context context) throws IOException, InterruptedException {
+ int sum = 0;
+ for (IntWritable val : values) {
+ sum += val.get();
+ }
+ result.set(sum);
+ context.write(key, result);
+ }
+ }
+
+ public static void main(String[] args) throws Exception {
+ Configuration conf = new Configuration();
+ Job job = Job.getInstance(conf, "word count");
+ job.setJarByClass(WordCount.class);
+ job.setMapperClass(TokenizerMapper.class);
+ job.setCombinerClass(IntSumReducer.class);
+ job.setReducerClass(IntSumReducer.class);
+ job.setOutputKeyClass(Text.class);
+ job.setOutputValueClass(IntWritable.class);
+ FileInputFormat.addInputPath(job, new Path(args[0]));
+ FileOutputFormat.setOutputPath(job, new Path(args[1]));
+ System.exit(job.waitForCompletion(true) ? 0 : 1);
+ }
+}
+2. Analysis of Weather Dataset on Multi node Cluster
+
+TDRIVER
+
+package classdemob2;
+
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.conf.*;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.util.*;
+
+
+public class Tdriver extends Configured implements Tool{
+      public int run(String[] args) throws Exception
+      {
+            
+            JobConf conf = new JobConf(getConf(), Tdriver.class);
+            conf.setJobName("HighestDriver");
+
+         
+            conf.setOutputKeyClass(Text.class);
+            conf.setOutputValueClass(IntWritable.class);
+
+            
+            conf.setMapperClass(Tmapper.class);
+            conf.setReducerClass(Treducer.class);
+            
+            Path inp = new Path(args[0]);
+            Path out = new Path(args[1]);
+            
+            FileInputFormat.addInputPath(conf, inp);
+            FileOutputFormat.setOutputPath(conf, out);
+
+            JobClient.runJob(conf);
+            return 0;
+      }
+     
+      public static void main(String[] args) throws Exception
+      {
+           
+        int res = ToolRunner.run(new Configuration(), new Tdriver(),args);
+            System.exit(res);
+      }
+}
+
+TREDUCER
+
+package classdemob2;
+
+import java.io.IOException;
+import java.util.Iterator;
+
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapred.*;
+
+public class Treducer extends MapReduceBase implements Reducer<Text, IntWritable, Text, IntWritable>
+{
+      
+      public void reduce(Text key, Iterator<IntWritable> values, OutputCollector<Text, IntWritable> output, Reporter reporter) throws IOException
+      {
+    	  int max_temp = 0; 
+    	  ; 
+          while (values.hasNext())
+                      {
+        	  int current=values.next().get();
+                         if ( max_temp <  current)  
+                        	 max_temp =  current;
+                      }  
+   output.collect(key, new IntWritable(max_temp/10)); 
+  }   }
+TMAPPER
+
+
+package classdemob2;
+import java.io.IOException;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapred.*;
+
+public class Tmapper extends MapReduceBase implements Mapper<LongWritable, Text, Text, IntWritable> {
+	public static final int MISSING = 9999;
+
+	public void map(LongWritable key, Text value, OutputCollector<Text, IntWritable> output, Reporter reporter)
+			throws IOException {
+		String line = value.toString();
+		String year = line.substring(15, 19);
+		int temperature;
+		if (line.charAt(87) == '+')
+			temperature = Integer.parseInt(line.substring(88, 92));
+		else
+			temperature = Integer.parseInt(line.substring(87, 92));
+
+		String quality = line.substring(92, 93);
+		if (temperature != MISSING && quality.matches("[01459]"))
+			output.collect(new Text(year), new IntWritable(temperature));
+
+	}
+
+}
+
+
+3.WEBLOG
+
+package weblogs;
+
+import java.io.IOException;
+import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+public class WeblogAnalyzer {
+
+public static class WeblogMapper extends Mapper<Object, Text, Text, IntWritable>{
+		
+         public static String APACHE_ACCESS_LOGS_PATTERN = "^(\\S+) (\\S+) (\\S+) \\[([\\w:/]+\\s[+\\-]\\d{4})\\] \"(\\S+) (\\S+) (\\S+)\" (\\d{3}) (\\d+) (.+?) \"([^\"]+|(.+?))\"";
+
+        public static Pattern pattern = Pattern.compile(APACHE_ACCESS_LOGS_PATTERN);
+
+			private static final IntWritable one = new IntWritable(1);
+			private Text url = new Text();
+
+		public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+				Matcher matcher = pattern.matcher(value.toString());
+				if (matcher.matches()) {
+			// 1 -IP; 2- -; 3- -; 4- Time; 5- Req Type; 6 -URL; 9- Resp Code; 10- Site; 11- Browser Type;
+				
+				url.set(matcher.group(1));
+				System.out.println(url.toString());
+				context.write(this.url, one);
+			}
+
+		}
+	}
+
+	public static class WeblogReducer extends Reducer<Text, IntWritable, Text, IntWritable>{
+		private IntWritable result = new IntWritable();
+
+		public void reduce(Text key, Iterable<IntWritable>values, Context context) throws IOException, InterruptedException {
+			int sum = 0;
+			for (IntWritable val : values) {
+				sum += val.get();
+			}
+			this.result.set(sum);
+			context.write(key, this.result);
+		}
+	}
+
+	public static void main(String[] args) throws Exception {
+		Configuration conf = new Configuration();
+		if (args.length != 2) {
+			System.err.println("Usage: WeblogAnalyzer <in> <out>");
+			System.exit(2);
+		}
+		Job job = Job.getInstance(conf, "Weblog Analyzer");
+		job.setJarByClass(WeblogAnalyzer.class);
+		job.setMapperClass(WeblogMapper.class);
+		job.setCombinerClass(WeblogReducer.class);
+		job.setReducerClass(WeblogReducer.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(IntWritable.class);
+		FileInputFormat.addInputPath(job, new Path(args[0]));
+		FileOutputFormat.setOutputPath(job, new Path(args[1]));
+		System.exit(job.waitForCompletion(true) ? 0 : 1);
+	}
+}
+
+
+
+
+
+
+4. SALES
+
+SalesMapper
+
+package SalesCountry;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.*;
+
+
+public class SalesMapper extends MapReduceBase implements Mapper <LongWritable, Text, Text, IntWritable> {
+	private final static IntWritable one = new IntWritable(1);
+
+	public void map(LongWritable key, Text value, OutputCollector <Text, IntWritable> output, Reporter reporter) throws IOException {
+
+		String valueString = value.toString();
+		String[] SingleCountryData = valueString.split(",");
+		output.collect(new Text(SingleCountryData[7]), one);
+	}
+}
+
+SalesCountryReducer
+
+package SalesCountry;
+
+import java.io.IOException;
+import java.util.*;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.*;
+
+public class SalesCountryReducer extends MapReduceBase implements Reducer<Text, IntWritable, Text, IntWritable> {
+
+	public void reduce(Text t_key, Iterator<IntWritable> values, OutputCollector<Text,IntWritable> output, Reporter reporter) throws IOException {
+		Text key = t_key;
+		int frequencyForCountry = 0;
+		while (values.hasNext()) {
+			// replace type of value with the actual type of our value
+			IntWritable value = (IntWritable) values.next();
+			frequencyForCountry += value.get();
+			
+		}
+		output.collect(key, new IntWritable(frequencyForCountry));
+	}
+}
+
+SalesCountryDriver
+
+package SalesCountry;
+
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapred.*;
+
+public class SalesCountryDriver {
+	public static void main(String[] args) {
+		JobClient my_client = new JobClient();
+		// Create a configuration object for the job
+		JobConf job_conf = new JobConf(SalesCountryDriver.class);
+
+		// Set a name of the Job
+		job_conf.setJobName("SalePerCountry");
+
+		// Specify data type of output key and value
+		job_conf.setOutputKeyClass(Text.class);
+		job_conf.setOutputValueClass(IntWritable.class);
+
+		// Specify names of Mapper and Reducer Class
+		job_conf.setMapperClass(SalesCountry.SalesMapper.class);
+		job_conf.setReducerClass(SalesCountry.SalesCountryReducer.class);
+
+		// Specify formats of the data type of Input and output
+		job_conf.setInputFormat(TextInputFormat.class);
+		job_conf.setOutputFormat(TextOutputFormat.class);
+
+		// Set input and output directories using command line arguments, 
+	    //arg[0] = name of input directory on HDFS, and arg[1] =  name of output directory to be created to store the output file.
+		
+		FileInputFormat.setInputPaths(job_conf, new Path(args[0]));
+		FileOutputFormat.setOutputPath(job_conf, new Path(args[1]));
+
+		my_client.setConf(job_conf);
+		try {
+			// Run the job 
+			JobClient.runJob(job_conf);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+}
+
+
+
+In this problem statement, we will find the days on which each basement has more trips.
+
+import java.io.IOException;
+import java.text.ParseException;
+import java.util.Date;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+public class Uber1 {
+public static class TokenizerMapper
+extends Mapper<Object, Text, Text, IntWritable>{
+java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("MM/dd/yyyy");
+String[] days ={"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+private Text basement = new Text();
+Date date = null;
+private int trips;
+public void map(Object key, Text value, Context context
+) throws IOException, InterruptedException {
+String line = value.toString();
+String[] splits = line.split(",");
+basement.set(splits[0]);
+try {
+date = format.parse(splits[1]);
+} catch (ParseException e) {
+// TODO Auto-generated catch block
+e.printStackTrace();
+}
+trips = new Integer(splits[3]);
+String keys = basement.toString()+ " "+days[date.getDay()];
+context.write(new Text(keys), new IntWritable(trips));
+}
+}
+public static class IntSumReducer
+extends Reducer<Text,IntWritable,Text,IntWritable> {
+private IntWritable result = new IntWritable();
+public void reduce(Text key, Iterable<IntWritable> values,
+Context context
+) throws IOException, InterruptedException {
+int sum = 0;
+for (IntWritable val : values) {
+sum += val.get();
+}
+result.set(sum);
+context.write(key, result);
+}
+}
+public static void main(String[] args) throws Exception {
+Configuration conf = new Configuration();
+Job job = Job.getInstance(conf, "Uber1");
+job.setJarByClass(Uber1.class);
+job.setMapperClass(TokenizerMapper.class);
+job.setCombinerClass(IntSumReducer.class);
+job.setReducerClass(IntSumReducer.class);
+job.setOutputKeyClass(Text.class);
+job.setOutputValueClass(IntWritable.class);
+FileInputFormat.addInputPath(job, new Path(args[0]));
+FileOutputFormat.setOutputPath(job, new Path(args[1]));
+System.exit(job.waitForCompletion(true) ? 0 : 1);
+}
+}
+
+
+In this problem statement, we will find the days on which each basement has more number of active vehicles.
+
+import java.io.IOException;
+import java.text.ParseException;
+import java.util.Date;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+public class Uber2 {
+public static class TokenizerMapper
+extends Mapper<Object, Text, Text, IntWritable>{
+java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("MM/dd/yyyy");
+String[] days ={"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+private Text basement = new Text();
+Date date = null;
+private int active_vehicles;
+public void map(Object key, Text value, Context context
+) throws IOException, InterruptedException {
+String line = value.toString();
+String[] splits = line.split(",");
+basement.set(splits[0]);
+try {
+date = format.parse(splits[1]);
+} catch (ParseException e) {
+// TODO Auto-generated catch block
+e.printStackTrace();
+}
+active_vehicles = new Integer(splits[2]);
+String keys = basement.toString()+ " "+days[date.getDay()];
+context.write(new Text(keys), new IntWritable(active_vehicles));
+}
+}
+public static class IntSumReducer
+extends Reducer<Text,IntWritable,Text,IntWritable> {
+private IntWritable result = new IntWritable();
+public void reduce(Text key, Iterable<IntWritable> values,
+Context context
+) throws IOException, InterruptedException {
+int sum = 0;
+for (IntWritable val : values) {
+sum += val.get();
+}
+result.set(sum);
+context.write(key, result);
+}
+}
+public static void main(String[] args) throws Exception {
+Configuration conf = new Configuration();
+Job job = Job.getInstance(conf, "Uber1");
+job.setJarByClass(Uber2.class);
+job.setMapperClass(TokenizerMapper.class);
+job.setCombinerClass(IntSumReducer.class);
+job.setReducerClass(IntSumReducer.class);
+job.setOutputKeyClass(Text.class);
+job.setOutputValueClass(IntWritable.class);
+FileInputFormat.addInputPath(job, new Path(args[0]));
+FileOutputFormat.setOutputPath(job, new Path(args[1]));
+System.exit(job.waitForCompletion(true) ? 0 : 1);
+}
+}
+
+
+
+
+
+
+
+
+
+
+
+1. records = LOAD '/home/hduser079/Desktop/temperature/sample.txt'
+ AS (year:chararray, temperature:int, quality:int);
+2. filtered = FILTER records BY temperature != 9999 AND quality IN (0,1,4,5,9);
+3. grouped = GROUP filtered BY year;
+4. max_temp = FOREACH grouped GENERATE group, MAX(filtered.temperature);
+5. DUMP max_temp; 
+
+
+5.DAILY SHOWS
+
+https://acadgild.com/blog/daily-show-data-analysis-using-pig
+1.Find the top five kinds of GoogleKnowlege_Occupation people who were guests in the show, in a particular time period.
+
+A = load '/home/hduser079/Desktop/programs/pigpg/dialy_show_guests' using PigStorage(',') AS (year:chararray,occupation:chararray,date:chararray,group:chararray,gusetlist:chararray);
+B = foreach A generate occupation,date;
+C = foreach B generate occupation,ToDate(date,'MM/dd/yy') as date;
+D = filter C by ((date> ToDate('1/11/99','MM/dd/yy')) AND (date<ToDate('6/11/99','MM/dd/yy')));
+#Date range can be modified by the user
+E = group D by occupation;
+F = foreach E generate group, COUNT(D) as cnt;
+G = order F by cnt desc;
+H = limit G 5;
+dump
+
+2.Find out the number of politicians who came each year. 
+
+A = load '/home/hduser079/Desktop/programs/pigpg/dialy_show_guests' using PigStorage(',') AS (year:chararray,occupation:chararray,date:chararray,group:chararray,gusetlist:chararray);
+B = foreach A generate year,group;
+C = filter B by group == 'Politician';
+D = group C by year;
+E = foreach D generate group, COUNT(C) as cnt;
+F = order E by cnt desc;
+dump
+
+6.AIRLINES
+LINK- https://acadgild.com/blog/aviation-data-analysis-using-apache-pig
+
+Problem Statement 1
+Find out the top 5 most visited destinations.
+
+REGISTER '/home/hduser079/Desktop/airlines/piggybank.jar';
+A = load '/home/hduser079/Desktop/airlines/DelayedFlights.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+B = foreach A generate (int)$1 as year, (int)$10 as flight_num, (chararray)$17 as origin,(chararray) $18 as dest;
+C = filter B by dest is not null;
+D = group C by dest;
+E = foreach D generate group, COUNT(C.dest);
+F = order E by $1 DESC;
+Result = LIMIT F 5;
+A1 = load '/home/hduser079/Desktop/airlines/airports.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+A2 = foreach A1 generate (chararray)$0 as dest, (chararray)$2 as city, (chararray)$4 as country;
+joined_table = join Result by $0, A2 by dest;
+dump joined_table;
+
+
+
+
+Problem Statement 2
+Which month has seen the most number of cancellations due to bad weather?
+
+REGISTER '/home/hduser079/Desktop/airlines/piggybank.jar';
+A = load '/home/hduser079/Desktop/airlines/DelayedFlights.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+B = foreach A generate (int)$2 as month,(int)$10 as flight_num,(int)$22 as cancelled,(chararray)$23 as cancel_code;
+C = filter B by cancelled == 1 AND cancel_code =='B';
+D = group C by month;
+E = foreach D generate group, COUNT(C.cancelled);
+F= order E by $1 DESC;
+Result = limit F 1;
+dump Result;
+
+
+Problem Statement 3
+Top ten origins with the highest AVG departure delay
+
+REGISTER '/home/acadgild/airline_usecase/piggybank.jar';
+A = load '/home/hduser079/Desktop/airlines/DelayedFlights.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+B1 = foreach A generate (int)$16 as dep_delay, (chararray)$17 as origin;
+C1 = filter B1 by (dep_delay is not null) AND (origin is not null);
+D1 = group C1 by origin;
+E1 = foreach D1 generate group, AVG(C1.dep_delay);
+Result = order E1 by $1 DESC;
+Top_ten = limit Result 10;
+Lookup = load '/home/hduser079/Desktop/airlines/airports.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+Lookup1 = foreach Lookup generate (chararray)$0 as origin, (chararray)$2 as city, (chararray)$4 as country;
+Joined = join Lookup1 by origin, Top_ten by $0;
+Final = foreach Joined generate $0,$1,$2,$4;
+Final_Result = ORDER Final by $3 DESC;
+dump Final_Result;
+
+
+
+Problem Statement 4
+Which route (origin & destination) has seen the maximum diversion?
+
+REGISTER '/home/acadgild/airline_usecase/piggybank.jar';
+A = load '/home/hduser079/Desktop/airlines/DelayedFlights.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER');
+B = FOREACH A GENERATE (chararray)$17 as origin, (chararray)$18 as dest, (int)$24 as diversion;
+C = FILTER B BY (origin is not null) AND (dest is not null) AND (diversion == 1);
+D = GROUP C by (origin,dest);
+E = FOREACH D generate group, COUNT(C.diversion);
+F = ORDER E BY $1 DESC;
+Result = limit F 10;
+dump Result;
+
+
+
+
+7.WORD COUNT
+aa = LOAd '/home/hduser079/Desktop/programs/pigpg/wordcount/wordc';
+bb = FOREACH aa GENERATE FLATTEN(TOKENIZE((chararray)$0)) as word;
+cc = group bb by word;
+dd = FOREACH cc GENERATE group,COUNT(bb);
+store dd INTO '/home/hduser079/Desktop/programs/pigpg/wordcount/pigcount';
+dump dd
+
+Temperature in Pig
+
+Code:
+1. records = LOAD '/home/hduser113/Desktop/temperature/sample.txt'
+AS (year:chararray, temperature:int, quality:int);
+2. filtered = FILTER records BY temperature != 9999 AND quality IN (0,1,4,5,9);
+3. grouped = GROUP filtered BY year;
+4. max_temp = FOREACH grouped GENERATE group, MAX(filtered.temperature);
+5. DUMP max_temp;
+
+
+9.UDF
+
+( Project name –udf package name- pig)
+
+package pig;
+import java.io.IOException;
+import org.apache.pig.EvalFunc;
+import org.apache.pig.data.Tuple;
+public class Sample_Eval extends EvalFunc<String> {
+    public String exec(Tuple input) throws IOException {
+        if (input == null || input.size() == 0)
+            return null;
+        String str = (String) input.get(0);
+        return str.toUpperCase();
+    }
+} 
+
+(save it as udf.jar)
+
+Create employee_new.txt and add the information as required.
+
+pig –x local
+
+REGISTER '/home/hduser113/Desktop/UDF.jar'
+
+employee_data = LOAD '/home/hduser113/Desktop/employee_new.txt' USING PigStorage(',') as (id:int, 
+name:chararray,workdate:chararray,daily_typing_pages:int);
+
+Upper_case = FOREACH employee_data GENERATE pig.Sample_Eval(name);
+
+dump Upper_case
+
+
+
+
+------------------------------------------------------------------------------------------------------------
+
+
+
+
+UDAF HIVE 
+
+create table Num_list(Num int) ROW FORMAT DELIMITED
+lines TERMINATED BY '\n';
+
+load data local inpath '/home/hduser080/Desktop/Numbers_List' into table Num_list;
+
+select * from Num_list;
+
+ADD JAR /home/hduser080/Desktop/hiveudaf.jar;
+
+CREATE TEMPORARY FUNCTION max AS 'com.hive.udaf.Max';
+
+SELECT max(Num) FROM Num_list;
+
+Eclipse Program:
+
+package com.hive.udaf;
+import org.apache.hadoop.hive.ql.exec.UDAF;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.hive.ql.exec.UDAFEvaluator;
+public class Max extends UDAF
+{
+public static class MaxIntUDAFEvaluator implements UDAFEvaluator
+{
+private IntWritable output;
+public void init()
+{
+output=null;
+}
+public boolean iterate(IntWritable maxvalue) // Process input table
+{
+if(maxvalue==null)
+{
+return true;
+}
+if(output == null)
+{
+output = new IntWritable(maxvalue.get());
+}
+else
+{
+output.set(Math.max(output.get(), maxvalue.get()));
+}
+return true;
+}
+public IntWritable terminatePartial()
+{
+return output;
+}
+public boolean merge(IntWritable other)
+{
+return iterate(other);
+}
+public IntWritable terminate() //final result
+{
+return output;
+}
+}
+}
+
+------------------------------------------------------------------
+
+
+HIVE UDF
+
+hive> create table p5(patient_id int, patient_name string, gender string, total_amount int, drug string) row format delimited fields terminated by ',' stored as textfile;
+
+
+hive> load data local inpath '/home/hduser009/Desktop/patient.csv' into table p5;
+
+
+
+hive> add jar hdfs:///t/hive1.jar;
+
+hive> create temporary function fun as 'hiveudf.udf1';
+
+hive>  select fun(drug) from p5;
+
+
+Eclipse Program
+
+package hiveudf;
+import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.io.Text;
+
+@Description(
+         name = "toupper",
+         value = "_FUNC_(str) - Converts a string to uppercase",
+         extended = "Example:\n" +
+         "  > SELECT toupper(author_name) FROM authors a;\n" +
+         "  STEPHEN KING"
+         )
+public class udf1 extends UDF {
+
+    public Text evaluate(Text s) {
+        Text to_value = new Text("");
+        if (s != null) {
+            try {
+                to_value.set(s.toString().toUpperCase());
+            } catch (Exception e) { // Should never happen
+                to_value = new Text(s);
+            }
+        }
+        return to_value;
+    }
+}
+
+
+Partiotion
+create table all_students3(sno int, sname String, passoutyear String) row format delimited fields terminated by ',';
+
+Load data local inpath '/home/hduser046/Desktop/hive_data.csv' into table all_students3;
+hive> select * from all_students3;
+hive> create table students_part3(sno int, sname String) PARTITIONED BY(passoutyear String);
+
+set hive.exec.dynamic.partition.mode=nonstrict;
+hive> INSERT OVERWRITE TABLE students_part3 PARTITION(passoutyear) SELECT sno,sname,passoutyear from  all_students3;
+hive> select * from students_part3;
+
+Bucketing
+
+create table students_bucket3 (sno int, sname String, passoutyear String) clustered by (passoutyear) sorted by (sno) into 3 buckets;
+hive> insert overwrite table students_bucket3 select * from all_students;
+hive> select * from students_bucket3;
+
+
+
+
+
+
+Before moving it into HDFS Create a directory in HDFS
+$ hadoop fs -mkdir /inputdata
+$ hadoop fs -put File.txt /inputdata
+
+Step 8: Run Jar file
+(Hadoop jar jarpath/jarfilename.jar packageName.ClassName
+PathToInputTextFile PathToOutputDirectry)
+$ hadoop jar /home/hduser/Desktop/test/test.jar
+wordcount.WordCount /inputdata/File.txt /outputdata
+Step 9: Open Result
+You can see the result on terminal
+$ hadoop fs -ls /outputdata
+$ hadoop fs -cat /outputdata/part-r-00000
+
+
+Or you can see your result in Hadoop Web Interface
+http://localhost:50070/
+Goto utilities> Browse file System> /outputdata
