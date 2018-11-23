@@ -1,0 +1,75 @@
+Partitioning
+
+input file looks like
+
+allstates.csv
+
+
+Andhra Pradesh,Guntur,1002
+Andhra Pradesh,Anantapur,1003
+Andhra Pradesh,Nellore,1006
+Arunachal Pradesh,Aruna,2003
+Arunachal Pradesh,Arunasl,2009
+Bihar,Sasura,3004
+Bihar,Mayakalal,3005
+Telangana,Hyderabad,4007
+Telangana,Rangareddy,4009
+Maharashtra,Mumbai,003
+Maharashtra,Nasik,5006
+
+
+hive> create table allstates(state string,District string,Enrolments string)
+    > row format delimited
+    > fields terminated by ',';
+hive> load data local inpath '/home/pratik102/Desktop/BDA_programs/Hive_Part_Buck/allstates.csv' into table allstates;
+
+hive> create table state_part(District string,Enrolments string) PARTITIONED BY(state string);
+
+hive> set hive.exec.dynamic.partition.mode=nonstrict;
+hive> insert overwrite table state_part PARTITION(state) SELECT district,enrolments,state from allstates;
+
+check localhost:50070 for output partitions
+
+
+Bucketing
+
+create employee.csv file
+
+Raj,1601,cse,10000,India
+Rahul,1602,it,12000,India
+Rohit,1603,ece,1900,India
+John,1500,msc,1200,USA
+Eminem,1501,bsc,1300,USA
+Peter,1400,mbbs,14000,UK
+Johnson,1401,mech,15000,UK
+Ram,1301,cse,10000,Nepal
+Jinping,1302,it,12000,Nepal
+Aman,1303,ece,1900,Nepal
+Josh,1200,msc,1200,Brazil
+Emily,1201,bsc,1300,Brazil
+Russel,1100,mbbs,14000,Australia
+Jack,1101,mech,15000,Australia
+
+
+next enter hive shell
+
+hive> create table employee(first_name string, job_id int,department string,salary string,country string)
+    > row format delimited
+    > fields terminated by ',';
+
+
+hive> Load data local inpath '/home/pratik102/Desktop/BDA_programs/Hive_Part_Buck/employee.csv' into table employee;
+hive> create table samplebucket(first_name string,job_id int,department string,salary string,country string)
+    > clustered by (country) into 4 buckets row format delimited fields terminated by ','; 
+
+hive> from employee 
+    > insert overwrite table samplebucket
+    > select first_name,job_id,department,salary,country;
+
+check localhost:50070 for output buckets
+
+
+
+
+
+
