@@ -1,0 +1,10 @@
+
+Temperature folder contains different files of temperature data (1901,1902......)
+
+A = load '/home/pratik102/Desktop/BDA_programs/Temperature' AS (str:chararray);
+B = foreach A generate SUBSTRING(str,15,19) AS year,(float) SUBSTRING(str,87,92) AS temp,(int)SUBSTRING(str,92,93) AS quality;
+C = filter B by temp!=9999 AND quality IN (0,1,4,5,9);
+D = group C by year;
+E = foreach D generate group,MAX(C.temp);
+dump E;
+
