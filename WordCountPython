@@ -1,0 +1,42 @@
+Copy input file to hdfs then type following python programs
+
+mapper.py
+
+#!/usr/bin/python
+
+import sys
+
+for line in sys.stdin:
+    for word in line.strip().split():
+        print "%st%d" % (word, 1)
+
+
+reducer.py
+
+#!/usr/bin/python
+
+import sys
+
+current_word = None
+current_count = 1
+
+for line in sys.stdin:
+    word, count = line.strip().split('t')
+    if current_word:
+        if word == current_word:
+            current_count += int(count)
+        else:
+            print "%st%d" % (current_word, current_count)
+            current_count = 1
+
+    current_word = word
+
+if current_count > 1:
+    print "%st%d" % (current_word, current_count)
+
+Then use this command in cmd her WordCountPython and WCPython are input and output directories in HDFS filesystem.
+
+
+hadoop jar /home/pratik102/Desktop/hadoop-streaming-2.7.6.jar -file /home/pratik102/Desktop/BDA_programs/Word_count_python/mapper.py -mapper mapper.py -file /home/pratik102/Desktop/word_count_python/reducer.py -reducer reducer.py -input /WordCountPython/input -output /WCPython
+
+
